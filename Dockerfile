@@ -1,6 +1,6 @@
 # docker build -t robotastic/trunk-recorder:latest .
 
-FROM robotastic/docker-gnuradio:latest
+FROM ratmandu/docker-gnuradio:latest
 
 
 
