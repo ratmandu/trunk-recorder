@@ -144,6 +144,33 @@ Source::Source(double c, double r, double e, std::string drv, std::string dev, C
 
     source_block = usrp_src;
   }
+
+  if (driver == "iio") {
+    std::vector<bool> enable_channels{1,1,0,0};
+    BOOST_LOG_TRIVIAL(info) << "SOURCE TYPE IIO";
+
+    gr::iio::fmcomms2_source<gr_complex>::sptr iio_src;
+    iio_src = gr::iio::fmcomms2_source<gr_complex>::make(device, enable_channels, 65535);
+    iio_src->set_len_tag_key("");
+    iio_src->set_gain_mode(0, "manual");
+    iio_src->set_gain(0, gain);
+
+    BOOST_LOG_TRIVIAL(info) << "Tuning to " << format_freq(center + error);
+    iio_src->set_frequency(center + error);
+
+    
+    BOOST_LOG_TRIVIAL(info) << "Setting sample rate to: " << FormatSamplingRate(rate);
+    iio_src->set_samplerate(rate);
+    
+    iio_src->set_quadrature(true);
+    iio_src->set_rfdc(true);
+    iio_src->set_bbdc(true);
+    iio_src->set_filter_params("Auto", "", 0.0, 0.0);
+
+    
+
+    source_block = iio_src;
+  }
 }
 
 void Source::set_iq_source(std::string iq_file, bool repeat, double center, double rate) {
@@ -320,6 +347,12 @@ void Source::set_gain(int r) {
   if (driver == "usrp") {
     gain = r;
     cast_to_usrp_sptr(source_block)->set_gain(gain);
+  }
+
+  if (driver == "iio") {
+    gain = r;
+    cast_to_iio_sptr(source_block)->set_gain(0, gain);
+    BOOST_LOG_TRIVIAL(info) << "Gain set to: " << gain;
   }
 }
 

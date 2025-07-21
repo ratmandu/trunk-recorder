@@ -12,6 +12,7 @@
 #include <gnuradio/basic_block.h>
 #include <gnuradio/top_block.h>
 #include <gnuradio/uhd/usrp_source.h>
+#include <gnuradio/iio/fmcomms2_source.h>
 #include <iostream>
 #include <numeric>
 #include <osmosdr/source.h>
@@ -151,6 +152,10 @@ public:
   Recorder *get_debug_recorder();
   Recorder *get_sigmf_recorder();
   std::vector<Recorder *> get_recorders();
+
+  inline gr::iio::fmcomms2_source<gr_complex>::sptr cast_to_iio_sptr(gr::basic_block_sptr p) {
+      return std::dynamic_pointer_cast<gr::iio::fmcomms2_source<gr_complex>, gr::basic_block>(p);
+  }
 
 #if GNURADIO_VERSION < 0x030900
   inline osmosdr::source::sptr cast_to_osmo_sptr(gr::basic_block_sptr p) {

@@ -75,7 +75,7 @@ find_package(Gnuradio REQUIRED)
 include(GrVersion)
 
 set(GR_REQUIRED_COMPONENTS RUNTIME ANALOG BLOCKS DIGITAL FILTER FFT PMT)
-find_package(Gnuradio REQUIRED COMPONENTS runtime analog blocks digital filter fft)
+find_package(Gnuradio REQUIRED COMPONENTS runtime analog blocks digital filter fft iio)
 if(Gnuradio_VERSION VERSION_LESS "3.8")
     find_package(Volk)
 endif()
@@ -140,6 +140,9 @@ find_package(GnuradioUHD)
 find_package(GnuradioOsmosdr)
 find_package(LibHackRF)
 find_package(LibUHD)
+find_package(GnuradioIIO)
+find_library(IIO_LIBRARIES iio)
+find_path(IIO_INCLUDE_DIRS iio.h)
 find_package(OpenSSL REQUIRED)
 find_package(CURL REQUIRED)
 if (STREAMER)
@@ -383,6 +386,7 @@ if(NOT Gnuradio_VERSION VERSION_LESS "3.8")
     gnuradio::gnuradio-digital
     gnuradio::gnuradio-filter
     gnuradio::gnuradio-pmt
+    gnuradio::gnuradio-iio
     )  
 endif()
 
