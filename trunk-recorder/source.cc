@@ -161,6 +161,7 @@ Source::Source(double c, double r, double e, std::string drv, std::string dev, C
     
     BOOST_LOG_TRIVIAL(info) << "Setting sample rate to: " << FormatSamplingRate(rate);
     iio_src->set_samplerate(rate);
+    actual_rate = rate;
     
     iio_src->set_quadrature(true);
     iio_src->set_rfdc(true);
