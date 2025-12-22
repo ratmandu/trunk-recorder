@@ -150,7 +150,7 @@ Source::Source(double c, double r, double e, std::string drv, std::string dev, C
     BOOST_LOG_TRIVIAL(info) << "SOURCE TYPE IIO";
 
     gr::iio::fmcomms2_source<gr_complex>::sptr iio_src;
-    iio_src = gr::iio::fmcomms2_source<gr_complex>::make(device, enable_channels, 65535);
+    iio_src = gr::iio::fmcomms2_source<gr_complex>::make(device, enable_channels, 4096);
     iio_src->set_len_tag_key("");
     iio_src->set_gain_mode(0, "manual");
     iio_src->set_gain(0, gain);
