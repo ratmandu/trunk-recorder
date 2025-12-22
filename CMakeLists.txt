@@ -23,7 +23,7 @@
 
 cmake_minimum_required(VERSION 3.12)
 
-project(Trunk-Recorder LANGUAGES CXX C VERSION "5.0.0")
+project(Trunk-Recorder LANGUAGES CXX C VERSION "5.1.1")
 
 
 configure_file(cmake.h.in "${PROJECT_BINARY_DIR}/cmake.h" @ONLY)
@@ -264,6 +264,7 @@ list(APPEND trunk_recorder_sources
   trunk-recorder/unit_tags.cc
   trunk-recorder/plugin_manager/plugin_manager.cc
   trunk-recorder/call_concluder/call_concluder.cc
+  trunk-recorder/autotune.cc
 
   lib/lfsr/lfsr.cxx
   #lib/gr-latency/latency_probe.cc

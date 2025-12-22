@@ -185,7 +185,7 @@ void print_status(std::vector<Source *> &sources, std::vector<System *> &systems
     }
 
     if (recorder) {
-        BOOST_LOG_TRIVIAL(info) << "\t[ " << recorder->get_num() << " ] State: " << format_state(recorder->get_state());
+        BOOST_LOG_TRIVIAL(info) << "\t[ " << std::setw(2) << recorder->get_num() << " ] State: " << format_state(recorder->get_state());
     }
   }
 
@@ -202,6 +202,11 @@ void print_status(std::vector<Source *> &sources, std::vector<System *> &systems
 
     if ((sys->get_system_type() != "conventional") && (sys->get_system_type() != "conventionalP25") && (sys->get_system_type() != "conventionalDMR") && (sys->get_system_type() != "conventionalSIGMF")) {
       BOOST_LOG_TRIVIAL(info) << "[" << sys->get_short_name() << "]\t" << format_freq(sys->get_current_control_channel()) << "\t" << sys->get_decode_rate() << " msg/sec";
+      
+      if ((sys->get_source()->get_autotune_source()) && (sys->get_system_type() == "p25")) {
+        // If control channel source has autotune enabled, perform autotune adjustments and log to console
+        autotune_control_channel(sys);
+      }
     }
   }
 
@@ -361,6 +366,9 @@ void unit_location(System *sys, long source_id, long talkgroup_num) {
   plugman_unit_location(sys, source_id, talkgroup_num);
 }
 
+
+
+
 void handle_call_grant(TrunkMessage message, System *sys, bool grant_message, Config &config, std::vector<Source *> &sources, std::vector<Call *> &calls) {
   bool call_found = false;
   bool duplicate_grant = false;
@@ -497,7 +505,7 @@ void handle_call_grant(TrunkMessage message, System *sys, bool grant_message, Co
     }
     std::string loghdr = log_header( call->get_short_name(), call->get_call_num(), call->get_talkgroup_display(), call->get_freq());
     if (superseding_grant) {
-      
+
       BOOST_LOG_TRIVIAL(info) << loghdr << "\u001b[36mSuperseding Grant\u001b[0m - Stopping original call: " << original_call_data << "- Superseding call: " << grant_call_data;
       // Attempt to start a new call on the preferred NAC.
       recording_started = start_recorder(call, message, config, sys, sources);
@@ -508,7 +516,7 @@ void handle_call_grant(TrunkMessage message, System *sys, bool grant_message, Co
         original_call->set_monitoring_state(SUPERSEDED);
         original_call->conclude_call();
       } else {
-        
+
         BOOST_LOG_TRIVIAL(info) << loghdr << "\u001b[36mCould not start Superseding recorder.\u001b[0m Continuing original call: " << original_call->get_call_num() << "C";
       }
     } else if (duplicate_grant) {
@@ -715,6 +723,12 @@ void retune_system(System *sys, gr::top_block_sptr &tb, std::vector<Source *> &s
   }
   if (!source_found) {
     BOOST_LOG_TRIVIAL(error) << "\t - Unable to retune System control channel, freq not covered by any source.";
+  } else {
+    if ((system->get_source()->get_autotune_source()) && (system->get_system_type() == "p25")) {
+      // If control channel source has autotune enabled, perform adjustments after retune completes
+      // Don't store measurements since the control channel recorder just started
+      autotune_control_channel(system, false);
+    }
   }
 }
 

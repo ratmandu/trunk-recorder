@@ -9,6 +9,9 @@ const int DB_UNSET = 999;
 
 struct Transmission {
   long source;
+  long talkgroup;
+  unsigned int slot;
+  unsigned int color_code;
   long start_time;
   long stop_time;
   long sample_count;
@@ -44,6 +47,7 @@ struct Config {
   bool enable_audio_streaming;
   bool soft_vocoder;
   bool record_uu_v_calls;
+  bool archive_files_on_failure;
   int frequency_format;
 };
 
@@ -90,6 +94,7 @@ enum Recorder_Type { DEBUG,
 
 struct Call_Data_t {
   long talkgroup;
+  long color_code;
   std::vector<unsigned long> patched_talkgroups;
   std::string talkgroup_tag;
   std::string talkgroup_alpha_tag;
@@ -114,6 +119,7 @@ struct Call_Data_t {
   bool duplex;
   bool audio_archive;
   bool transmission_archive;
+  bool archive_files_on_failure;
   bool call_log;
   bool compress_wav;
   char filename[300];
