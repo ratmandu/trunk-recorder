@@ -53,11 +53,11 @@ int convert_media(char *filename, char *converted, char *date, const char *short
 
 int create_call_json(Call_Data_t& call_info) {
   // Create call JSON, write it to disk, and pass back a json object to call_info
-  
+
   // Using nlohmann::ordered_json to preserve the previous order
   // Bools are stored as 0 or 1 as in previous versions
   // Call length is rounded up to the nearest second as in previous versions
-  // Time stored in fractional seconds will omit trailing zeroes per json spec (1.20 -> 1.2) 
+  // Time stored in fractional seconds will omit trailing zeroes per json spec (1.20 -> 1.2)
   nlohmann::ordered_json json_data =
       {
           {"freq", int(call_info.freq)},
@@ -81,8 +81,10 @@ int create_call_json(Call_Data_t& call_info) {
           {"talkgroup_description", call_info.talkgroup_description},
           {"talkgroup_group_tag", call_info.talkgroup_tag},
           {"talkgroup_group", call_info.talkgroup_group},
+          {"color_code", call_info.color_code},
           {"audio_type", call_info.audio_type},
-          {"short_name", call_info.short_name}};
+          {"short_name", call_info.short_name}
+        };
   // Add any patched talkgroups
   if (call_info.patched_talkgroups.size() > 1) {
     BOOST_FOREACH (auto &TGID, call_info.patched_talkgroups) {
@@ -109,7 +111,7 @@ int create_call_json(Call_Data_t& call_info) {
         {"signal_system", call_info.transmission_source_list[i].signal_system},
         {"tag", call_info.transmission_source_list[i].tag}};
   }
-  // Add created JSON to call_info  
+  // Add created JSON to call_info
   call_info.call_json = json_data;
 
   // Output the JSON status file
@@ -120,7 +122,7 @@ int create_call_json(Call_Data_t& call_info) {
     return 0;
   } else {
     std::string loghdr = log_header( call_info.short_name, call_info.call_num, call_info.talkgroup_display , call_info.freq);
-    BOOST_LOG_TRIVIAL(error) << loghdr << "C\033[0m \t Unable to create JSON file: " << call_info.status_filename;
+    BOOST_LOG_TRIVIAL(error) << loghdr << "\033[0m\tUnable to create JSON file: " << call_info.status_filename;
     return 1;
   }
 }
@@ -138,9 +140,58 @@ bool checkIfFile(std::string filePath) {
   return false;
 }
 
-void remove_call_files(Call_Data_t call_info) {
+void remove_call_files(Call_Data_t call_info, bool plugin_failure=false) {
 
-  if (!call_info.audio_archive) {
+  if (plugin_failure) {
+    std::string loghdr = log_header( call_info.short_name, call_info.call_num, call_info.talkgroup_display , call_info.freq);
+    switch (call_info.archive_files_on_failure) {
+      case true:
+        BOOST_LOG_TRIVIAL(error) << loghdr << "Upload failed after " << call_info.retry_attempt << " attempts - " <<  Color::GRN << "Archiving files" << Color::RST;
+        break;
+      case false:
+        BOOST_LOG_TRIVIAL(error) << loghdr << "Upload failed after " << call_info.retry_attempt << " attempts - " << Color::RED << "Removing files" << Color::RST;
+        break;
+    }
+  }
+
+  if (call_info.audio_archive || (plugin_failure && call_info.archive_files_on_failure)) {
+    if (call_info.transmission_archive) {
+      // if the files are being archived, move them to the capture directory
+      for (std::vector<Transmission>::iterator it = call_info.transmission_list.begin(); it != call_info.transmission_list.end(); ++it) {
+        Transmission t = *it;
+
+        // Only move transmission wavs if they exist
+        if (checkIfFile(t.filename)) {
+
+          // Prevent "boost::filesystem::copy_file: Invalid cross-device link" errors by using std::filesystem if boost < 1.76
+          // This issue exists for old boost versions OR 5.x kernels
+          #if (BOOST_VERSION/100000) == 1 && ((BOOST_VERSION/100)%1000) < 76
+            fs::path target_file = fs::path(fs::path(call_info.filename ).replace_filename(fs::path(t.filename).filename()));
+            fs::path transmission_file = t.filename;
+            fs::copy_file(transmission_file, target_file);
+          #else
+            boost::filesystem::path target_file = boost::filesystem::path(fs::path(call_info.filename ).replace_filename(fs::path(t.filename).filename()));
+            boost::filesystem::path transmission_file = t.filename;
+            boost::filesystem::copy_file(transmission_file, target_file);
+          #endif
+        //boost::filesystem::path target_file = boost::filesystem::path(call_info.filename).replace_filename(transmission_file.filename()); // takes the capture dir from the call file and adds the transmission filename to it
+        }
+
+      }
+    }
+
+    // remove the transmission files from the temp directory
+    for (std::vector<Transmission>::iterator it = call_info.transmission_list.begin(); it != call_info.transmission_list.end(); ++it) {
+      Transmission t = *it;
+      if (checkIfFile(t.filename)) {
+        remove(t.filename);
+      }
+    }
+
+
+
+  } else {
+
     if (checkIfFile(call_info.filename)) {
       remove(call_info.filename);
     }
@@ -153,42 +204,10 @@ void remove_call_files(Call_Data_t call_info) {
         remove(t.filename);
       }
     }
-  } else {
-    if (call_info.transmission_archive) {
-      // if the files are being archived, move them to the capture directory
-      for (std::vector<Transmission>::iterator it = call_info.transmission_list.begin(); it != call_info.transmission_list.end(); ++it) {
-        Transmission t = *it;
 
-        // Only move transmission wavs if they exist
-        if (checkIfFile(t.filename)) {
-          
-          // Prevent "boost::filesystem::copy_file: Invalid cross-device link" errors by using std::filesystem if boost < 1.76
-          // This issue exists for old boost versions OR 5.x kernels
-          #if (BOOST_VERSION/100000) == 1 && ((BOOST_VERSION/100)%1000) < 76
-            fs::path target_file = fs::path(fs::path(call_info.filename ).replace_filename(fs::path(t.filename).filename()));
-            fs::path transmission_file = t.filename;      
-            fs::copy_file(transmission_file, target_file); 
-          #else
-            boost::filesystem::path target_file = boost::filesystem::path(fs::path(call_info.filename ).replace_filename(fs::path(t.filename).filename()));
-            boost::filesystem::path transmission_file = t.filename;
-            boost::filesystem::copy_file(transmission_file, target_file); 
-          #endif
-        //boost::filesystem::path target_file = boost::filesystem::path(call_info.filename).replace_filename(transmission_file.filename()); // takes the capture dir from the call file and adds the transmission filename to it
-        }
-
-      }
-    } 
-
-    // remove the transmission files from the temp directory
-    for (std::vector<Transmission>::iterator it = call_info.transmission_list.begin(); it != call_info.transmission_list.end(); ++it) {
-      Transmission t = *it;
-      if (checkIfFile(t.filename)) {
-        remove(t.filename);
-      }
-    }
   }
 
-  if (!call_info.call_log) {
+  if (!call_info.call_log && !(plugin_failure && call_info.archive_files_on_failure)) {
     if (checkIfFile(call_info.status_filename)) {
       remove(call_info.status_filename);
     }
@@ -238,10 +257,10 @@ Call_Data_t upload_call_worker(Call_Data_t call_info) {
       } else {
         talkgroup_title = (char *)std::to_string(call_info.talkgroup).c_str();
       }
-      
+
       time_t start_time = static_cast<time_t>(call_info.start_time);
       result = convert_media(call_info.filename, call_info.converted, std::ctime(&start_time), call_info.short_name.c_str(), talkgroup_title);
-      
+
       if (result < 0) {
         call_info.status = FAILED;
         return call_info;
@@ -253,7 +272,7 @@ Call_Data_t upload_call_worker(Call_Data_t call_info) {
       shell_command << call_info.upload_script << " " << call_info.filename << " " << call_info.status_filename << " " << call_info.converted;
       shell_command_string = shell_command.str();
       std::string loghdr = log_header( call_info.short_name, call_info.call_num, call_info.talkgroup_display , call_info.freq);
-      BOOST_LOG_TRIVIAL(info) << loghdr << "C\033[0m \t Running upload script: " << shell_command_string;
+      BOOST_LOG_TRIVIAL(info) << loghdr << "\033[0m\tRunning upload script: " << shell_command_string;
 
       result = system(shell_command_string.c_str());
     }
@@ -341,19 +360,7 @@ Call_Data_t Call_Concluder::create_call_data(Call *call, System *sys, Config con
   call_info.talkgroup_display = call->get_talkgroup_display();
   call_info.patched_talkgroups = sys->get_talkgroup_patch(call_info.talkgroup);
   call_info.min_transmissions_removed = 0;
-
-  Talkgroup *tg = sys->find_talkgroup(call->get_talkgroup());
-  if (tg != NULL) {
-    call_info.talkgroup_tag = tg->tag;
-    call_info.talkgroup_alpha_tag = tg->alpha_tag;
-    call_info.talkgroup_description = tg->description;
-    call_info.talkgroup_group = tg->group;
-  } else {
-    call_info.talkgroup_tag = "";
-    call_info.talkgroup_alpha_tag = "";
-    call_info.talkgroup_description = "";
-    call_info.talkgroup_group = "";
-  }
+  call_info.color_code = 0;
 
   if (call->get_is_analog()) {
     call_info.audio_type = "analog";
@@ -408,6 +415,19 @@ Call_Data_t Call_Concluder::create_call_data(Call *call, System *sys, Config con
       call_info.stop_time = t.stop_time;
     }
 
+    if (call_info.color_code == -1 && t.color_code != -1) {
+      call_info.color_code = t.color_code;
+      if (call_info.color_code != t.color_code) {
+        BOOST_LOG_TRIVIAL(warning) << loghdr << "Call has multiple Color Codes - previous Transmission Color Code: " << call_info.color_code << " current Transmission Color Code: " << t.color_code;
+      }
+    }
+
+    if (call_info.talkgroup != t.talkgroup) {
+      BOOST_LOG_TRIVIAL(warning) << loghdr << "Transmission has a different Talkgroup than Call - Call Talkgroup: " << call_info.talkgroup << " Transmission Talkgroup: " << t.talkgroup;
+      call_info.talkgroup = t.talkgroup;
+    }
+
+
     Call_Source call_source = {t.source, t.start_time, total_length, false, "", tag};
     Call_Error call_error = {t.start_time, total_length, t.length, t.error_count, t.spike_count};
     call_info.error_count = call_info.error_count + t.error_count;
@@ -419,6 +439,22 @@ Call_Data_t Call_Concluder::create_call_data(Call *call, System *sys, Config con
     it++;
   }
 
+
+
+  Talkgroup *tg = sys->find_talkgroup(call_info.talkgroup);
+  if (tg != NULL) {
+    call_info.talkgroup_tag = tg->tag;
+    call_info.talkgroup_alpha_tag = tg->alpha_tag;
+    call_info.talkgroup_description = tg->description;
+    call_info.talkgroup_group = tg->group;
+  } else {
+    call_info.talkgroup_tag = "";
+    call_info.talkgroup_alpha_tag = "";
+    call_info.talkgroup_description = "";
+    call_info.talkgroup_group = "";
+  }
+
+  call_info.archive_files_on_failure = config.archive_files_on_failure;
   call_info.length = total_length;
 
   return call_info;
@@ -457,17 +493,18 @@ void Call_Concluder::manage_call_data_workers() {
 
     if (it->wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
       Call_Data_t call_info = it->get();
-      
+
       if (call_info.status == RETRY) {
         call_info.retry_attempt++;
         time_t start_time = call_info.start_time;
         std::string loghdr = log_header( call_info.short_name, call_info.call_num, call_info.talkgroup_display , call_info.freq);
 
         if (call_info.retry_attempt > Call_Concluder::MAX_RETRY) {
-          BOOST_LOG_TRIVIAL(error) << "[" << call_info.short_name << "]\t\033[0;34m" << call_info.call_num << "C\033[0m Failed to conclude call - TG: " << call_info.talkgroup_display << "\t" << std::put_time(std::localtime(&start_time), "%c %Z");
+          remove_call_files(call_info, true);
+          BOOST_LOG_TRIVIAL(error) << loghdr << "Failed to conclude call - " << std::put_time(std::localtime(&start_time), "%c %Z");
         } else {
           long jitter = rand() % 10;
-          long backoff = (2 ^ call_info.retry_attempt * 60) + jitter;
+          long backoff = ((1 << call_info.retry_attempt) * 60) + jitter;
           call_info.process_call_time = time(0) + backoff;
           retry_call_list.push_back(call_info);
           BOOST_LOG_TRIVIAL(error) << loghdr << std::put_time(std::localtime(&start_time), "%c %Z") << " retry attempt " << call_info.retry_attempt << " in " << backoff << "s\t retry queue: " << retry_call_list.size() << " calls";

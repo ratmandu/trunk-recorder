@@ -41,7 +41,7 @@ Center Frequency Calculators:
 Configuration File:
 - https://www.radioetcetera.site/trunk-recorder-config-editor/ - tool for using a GUI to create config.json files
 - https://github.com/AlertPageSDR/tr_configurator - If you have a Radio Reference Premium account, you can use this tool to automatically generate a config.json based on the RR data for a given system (or systems)
-- https://github.com/robotastic/trunk-recorder-configs - example configurations for different systems
+- https://github.com/TrunkRecorder/trunk-recorder-configs - example configurations for different systems
 
 ### Gain
 
@@ -127,6 +127,7 @@ There is a list of available Plugins [here](./Plugins.md).
 | plugins                      |          |                                                  | array of JSON objects<br />[{}]                              | An array of JSON formatted [Plugin Objects](#plugin-object) that define the different plugins to use. Refer to the [Plugin System](notes/PLUGIN-SYSTEM.md) documentation for more details. |
 | defaultMode                  |          | "digital"                                        | **"analog"** or **"digital"**                                | Default mode to use when a talkgroups is not listed in the **talkgroupsFile**. The options are *digital* or *analog*. The default is *digital*. This argument is global and not system-specific, and only affects `smartnet` trunking systems which can have both analog and digital talkpaths. |
 | tempDir                      |          | /dev/shm *(if available)* else current directory | string                                                       | The complete path to the directory where individual Transmissions are recorded, prior to be combined into a single file. It is best to use memory based file system for this. |
+| archiveFilesOnFailure        |          | false                                            | **true** / **false**                                         | If a plugin (like the OpenMHz or Broadcastify uploader) fails, should the files be saved locally or removed. If Audio Archive is set to **true** then audio is always archived and overrides this. | 
 | captureDir                   |          | current directory                                | string                                                       | The complete path to the directory where recordings should be saved. |
 | callTimeout                  |          | 3                                                | number                                                       | A Call will stop recording and save if it has not received anything on the control channel, after this many seconds. |
 | uploadServer                 |          |                                                  | string                                                       | The URL for uploading to OpenMHz. The default is an empty string. See the Config tab for your system in OpenMHz to find what the value should be. |
@@ -148,7 +149,7 @@ There is a list of available Plugins [here](./Plugins.md).
 | debugRecorderAddress         |          | "127.0.0.1"                                      | string                                                       | The network address of the computer that will be monitoring the Debug Recorders. UDP packets will be sent from Trunk Recorder to this computer. The default is *"127.0.0.1"* which is the address used for monitoring on the same computer as Trunk Recorder. |
 | audioStreaming               |          | false                                            | **true** / **false**                                         | Whether or not to enable the audio streaming callbacks for plugins. |
 | newCallFromUpdate            |          | true                                             | **true** / **false**                                         | Allow for UPDATE trunking messages to start a new Call, in addition to GRANT messages. This may result in more Calls with no transmisions, and use more Recorders. The flipside is that it may catch parts of a Call that would have otherwise been missed. Turn this off if you are running out of Recorders. |
-| softVocoder                  |          | false                                            | **true** / **false**                                         | Use the Software Decode vocoder from OP25 for Phase 1 audio. Give it a try if you are hearing weird tones in your audio. Whether it makes your audio sound better or worse is a matter of preference. |
+| softVocoder                  |          | false                                            | **true** / **false**                                         | Use the Software Decode vocoder from OP25 for P25 and DMR. Give it a try if you are hearing weird tones in your audio. Whether it makes your audio sound better or worse is a matter of preference. |
 | recordUUVCalls               |          | true                                             | **true** / **false**                                         | *P25 only* Record Unit to Unit Voice calls.        |
 
 
@@ -169,7 +170,7 @@ There is a list of available Plugins [here](./Plugins.md).
 | signalDetectorThreshold |       |           | number                      | If set, a static threshold will be used for the Signal Detector on all conventional recorder. Otherwise, the threshold value for the noise floor will be automatically be determined. Only set this is you are having problems. The value is in dB, but is generally higher than the Squelch value because the power is measured differently |
 | ppm              |          |       0       | number                      | The tuning error for the SDR in ppm (parts per million), as an alternative to `error` above. Use a program like GQRX to find an accurate value. |
 | agc              |          |     false     | **true** / **false**        | Whether or not to enable the SDR's automatic gain control (if supported). This is false by default. It is not recommended to set this as it often yields worse performance compared to a manual gain setting. |
-| gainSettings     |          |               | { "stageName": value}       | Set the gain for any stage. The value for this setting should be passed as an object, where the key specifies the name of the gain stage and the value is the amount of gain, as an int. For example:<br /> ````"gainSettings": { "IF": 10, "BB": 11},```` |
+| gainSettings     |          |               | { "stageName": value}       | Set the gain for any stage. The value for this setting should be passed as an object, where the key specifies the name of the gain stage and the value is the amount of gain in dB. For example:<br /> ````"gainSettings": { "IF": 10, "BB": 11.9},```` |
 | ifGain           |          |               | number                      | *AirSpy/hackrf only* sets the **IF** gain.                   |
 | bbGain           |          |               | number                      | *hackrf only* sets the **BB** gain.                          |
 | mixGain          |          |               | number                      | *AirSpy only* sets the **MIX** gain.                         |
@@ -179,14 +180,26 @@ There is a list of available Plugins [here](./Plugins.md).
 | antenna          |          |               | string, e.g.: **"TX/RX"**   | *usrp only* selects which antenna jack to use                |
 | enabled          |          |     true      | **true** / **false**        | control whether a configured source is enabled or disabled   |
 
+### Source Object - Experimental Options
+
+| Key      | Required | Default Value | Type                 | Description                                                  |
+| -------- | :------: | :-----------: | -------------------- | ------------------------------------------------------------ |
+| autoTune |          | false         | **true** / **false** | Utilize observed tuning offsets to calculate an average error, and apply corrective values to conventional and P25 systems using enabled sources. |
+
+Autotune keeps track of the last twenty tuning errors for each source as reported by the [band-edge filter](https://wiki.gnuradio.org/index.php/FLL_Band-Edge).  These values are used to calculate a running average, and applied at the beginning of each call.  While precision SDR devices may not benefit much from this, `autoTune` can typically keep SDRs with a basic TCXO within +/- ~250 Hz of the target frequency, even when the initial error offset or PPM in the config may be inaccurate.  If the calculated correction exceeds 3.5 PPM, warnings will be generated to advise finding a closer starting `ppm` or `error` value in the config.json.
+
+Autotune corrections will also be applied to P25 control channels if using an enabled source. Once per status display (200 seconds), the control channel will be fine-tuned based on the calculated offset for that source.  Please note there may be situations where autotune will make things *worse*.  It operates under a principle that tranmitted signals are consistent and accurate to be used as a continuous point of reference.  This is generally the case with most systems, but it cannot always be assumed.
+
+During the status display, each source will report the running average as well as a suggested `error` value to use in the config.json to improve the initial offset.
+
 ***
 ### SigMF Sources
 
 | Key              | Required | Default Value | Type                        | Description                                                  |
 | :--------------- | :------: | :-----------: | --------------------------- | ------------------------------------------------------------ |
 | driver           |    ✓     |               | **"sigmffile"**| Specify that you wish to use a SigMF based source block              |
-| sigmfMeta          |    ✓     |               | string                      | Path and filenme for the SigMF metadata File                            |
-| sigmfData          |    ✓     |               | string                      | Path and filenme for the SigMF data File                            |
+| sigmfMeta          |    ✓     |               | string                      | Path and filename for the SigMF metadata File                            |
+| sigmfData          |    ✓     |               | string                      | Path and filename for the SigMF data File                            |
 | repeat           |          |     false     | **true** / **false**        | whether to repeat playback of the IQ file when it reaches the end |
 | digitalRecorders |          |               | number                      | The number of Digital Recorders to have attached to this source. This is essentially the number of simultaneous calls you can record at the same time in the frequency range that this Source will be tuned to. It is limited by the CPU power of the machine. Some experimentation might be needed to find the appropriate number. *This is only required for Trunk systems. Channels in Conventional systems have dedicated recorders and do not need to be included here.* |
 | analogRecorders  |          |               | number                      | The number of Analog Recorder to have attached to this source. The same as Digital Recorders except for Analog Voice channels. *This is only required for Trunk systems. Channels in Conventional systems have dedicated recorders and do not need to be included here.* |
@@ -199,7 +212,7 @@ There is a list of available Plugins [here](./Plugins.md).
 | Key              | Required | Default Value | Type                        | Description                                                  |
 | :--------------- | :------: | :-----------: | --------------------------- | ------------------------------------------------------------ |
 | driver           |    ✓     |               | **"iqfile"**| Specify that you wish to use an IQ File based source block              |
-| iqfile           |    ✓     |               | string                      | Path and filenme for the IQ File                            |
+| iqfile           |    ✓     |               | string                      | Path and filename for the IQ File                            |
 | repeat           |          |     false     | **true** / **false**        | whether to repeat playback of the IQ file when it reaches the end |
 | center           |    ✓     |               | number                      | The center frequency in Hz to tune the SDR to                |
 | rate             |    ✓     |               | number                      | The sampling rate to set the SDR to, in samples / second     |
