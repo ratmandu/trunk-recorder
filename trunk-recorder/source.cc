@@ -168,7 +168,7 @@ Source::Source(double c, double r, double e, std::string drv, std::string dev, C
     iio_src->set_quadrature(true);
     iio_src->set_rfdc(true);
     iio_src->set_bbdc(true);
-    iio_src->set_filter_params("Auto", "", 0.0, 0.0);
+    iio_src->set_filter_params("Off", "", 0.0, 0.0);
 
     
 
