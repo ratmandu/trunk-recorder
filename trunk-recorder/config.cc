@@ -477,7 +477,6 @@ bool load_config(string config_file, Config &config, gr::top_block_sptr &tb, std
           BOOST_LOG_TRIVIAL(info) << "Device: " << device;
 
           int silence_frames = element.value("silenceFrames", 0);
-          unsigned long buffer_length = element.value("bufLength", 32768);
           double center = element.value("center", 0.0);
           double rate = element.value("rate", 0.0);
           double error = element.value("error", 0.0);
