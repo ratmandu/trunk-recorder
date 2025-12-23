@@ -46,6 +46,7 @@ Source::Source(double c, double r, double e, std::string drv, std::string dev, C
   rate = r;
   center = c;
   error = e;
+  bufLength = 0;
   set_min_max();
   driver = drv;
   device = dev;
@@ -67,6 +68,7 @@ Source::Source(double c, double r, double e, std::string drv, std::string dev, C
   next_selector_port = 0;
   autotune_source = false;
   autotune_manager = new AutotuneManager(this);
+
 
   recorder_selector = gr::blocks::selector::make(sizeof(gr_complex), 0, 0);
 
@@ -151,8 +153,20 @@ Source::Source(double c, double r, double e, std::string drv, std::string dev, C
     std::vector<bool> enable_channels{1,1,0,0};
     BOOST_LOG_TRIVIAL(info) << "SOURCE TYPE IIO";
 
+    // check to see if device string has bufferLength, and if so, split them
+    std::string dev = device;
+    bufLength = 32768;
+
+    if (device.find(",")) {
+      dev = device.substr(0,device.find(","));
+      bufLength = std::stoul(device.substr(device.find(",") + 1, device.length()));
+    }
+
+    BOOST_LOG_TRIVIAL(info) << "Device: " << dev;
+    BOOST_LOG_TRIVIAL(info) << "Buffer Length: " << bufLength;
+
     gr::iio::fmcomms2_source<gr_complex>::sptr iio_src;
-    iio_src = gr::iio::fmcomms2_source<gr_complex>::make(device, enable_channels, 102400);
+    iio_src = gr::iio::fmcomms2_source<gr_complex>::make(dev, enable_channels, bufLength);
     iio_src->set_len_tag_key("");
     iio_src->set_gain_mode(0, "manual");
     iio_src->set_gain(0, gain);

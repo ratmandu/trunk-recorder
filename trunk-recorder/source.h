@@ -54,6 +54,7 @@ class Source {
   int debug_recorder_port;
   int next_selector_port;
   int silence_frames;
+  unsigned long bufLength;
   Config *config;
   bool autotune_source;
 
