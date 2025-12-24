@@ -428,6 +428,13 @@ void Source::set_gain_mode(bool m) {
     } else {
       BOOST_LOG_TRIVIAL(info) << "Auto gain control is OFF";
     }
+  } else if (driver == "iio") {
+    gain_mode = m;
+    if (gain_mode) {
+      cast_to_iio_sptr(source_block)->set_gain_mode(0, "fast_attack");
+    } else {
+      cast_to_iio_sptr(source_block)->set_gain_mode(0, "manual");
+    }
   }
 }
 
