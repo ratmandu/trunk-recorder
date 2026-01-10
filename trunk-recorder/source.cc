@@ -10,6 +10,9 @@ int Source::get_num() {
 };
 
 gr::basic_block_sptr Source::get_src_block() {
+  if (driver == "iio") {
+    return conv_block;
+  }
   return source_block;
 }
 
@@ -165,8 +168,8 @@ Source::Source(double c, double r, double e, std::string drv, std::string dev, C
     BOOST_LOG_TRIVIAL(info) << "Device: " << dev;
     BOOST_LOG_TRIVIAL(info) << "Buffer Length: " << bufLength;
 
-    gr::iio::fmcomms2_source<gr_complex>::sptr iio_src;
-    iio_src = gr::iio::fmcomms2_source<gr_complex>::make(dev, enable_channels, bufLength);
+    gr::iio::fmcomms2_source<std::int16_t>::sptr iio_src;
+    iio_src = gr::iio::fmcomms2_source<std::int16_t>::make(dev, enable_channels, bufLength);
     iio_src->set_len_tag_key("");
     iio_src->set_gain_mode(0, "manual");
     iio_src->set_gain(0, gain);
@@ -184,8 +187,10 @@ Source::Source(double c, double r, double e, std::string drv, std::string dev, C
     iio_src->set_bbdc(true);
     iio_src->set_filter_params("Auto", "", 0.0, 0.0);
 
+    gr::blocks::interleaved_short_to_complex::sptr conv;
+    conv = gr::blocks::interleaved_short_to_complex::make();
     
-
+    conv_block = conv;
     source_block = iio_src;
   }
 }
@@ -269,14 +274,27 @@ void Source::attach_selector(gr::top_block_sptr tb) {
   if (!attached_selector) {
     attached_selector = true;
     recorder_selector = gr::blocks::selector::make(sizeof(gr_complex), 0, 0);
-    tb->connect(source_block, 0, recorder_selector, 0);
+    if (driver == "iio") {
+      // tb->connect(source_block, 0, conv_block, 0);
+      // tb->connect(conv_block, 0, recorder_selector, 0);
+      recorder_selector = gr::blocks::selector::make(sizeof(std::int16_t), 0, 0);
+      tb->connect(source_block, 0, recorder_selector, 0);
+    } else {
+      recorder_selector = gr::blocks::selector::make(sizeof(gr_complex), 0, 0);
+      tb->connect(source_block, 0, recorder_selector, 0);
+    }
   }
 }
 
 void Source::attach_detector(gr::top_block_sptr tb) {
   if (!attached_detector) {
     attached_detector = true;
-    tb->connect(source_block, 0, signal_detector, 0);
+    if (driver == "iio") {
+      tb->connect(source_block, 0, conv_block, 0);
+      tb->connect(conv_block, 0, signal_detector, 0);
+    } else {
+      tb->connect(source_block, 0, signal_detector, 0);
+    }
   }
 }
 
@@ -374,8 +392,8 @@ void Source::set_gain(double r) {
 
   if (driver == "iio") {
     gain = r;
-    cast_to_iio_sptr(source_block)->set_gain(0, gain);
-    BOOST_LOG_TRIVIAL(info) << "Gain set to: " << gain;
+    // cast_to_iio_sptr(source_block)->set_gain(0, gain);
+    // BOOST_LOG_TRIVIAL(info) << "Gain set to: " << gain;
   }
 }
 
@@ -431,9 +449,9 @@ void Source::set_gain_mode(bool m) {
   } else if (driver == "iio") {
     gain_mode = m;
     if (gain_mode) {
-      cast_to_iio_sptr(source_block)->set_gain_mode(0, "fast_attack");
+      // cast_to_iio_sptr(source_block)->set_gain_mode(0, "fast_attack");
     } else {
-      cast_to_iio_sptr(source_block)->set_gain_mode(0, "manual");
+      // cast_to_iio_sptr(source_block)->set_gain_mode(0, "manual");
     }
   }
 }
@@ -667,7 +685,12 @@ void Source::create_debug_recorder(gr::top_block_sptr tb, int source_num) {
   debug_recorder_port = config->debug_recorder_port + source_num;
   debug_recorder_sptr log = make_debug_recorder(this, config->debug_recorder_address, debug_recorder_port);
   debug_recorders.push_back(log);
-  tb->connect(source_block, 0, log, 0);
+  if (driver == "iio") {
+    tb->connect(source_block, 0, conv_block, 0);
+    tb->connect(conv_block, 0, log, 0);
+  } else {
+    tb->connect(source_block, 0, log, 0);
+  }
 }
 
 Recorder *Source::get_analog_recorder(Talkgroup *talkgroup, int priority, Call *call) {

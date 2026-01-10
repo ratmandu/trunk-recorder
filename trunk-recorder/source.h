@@ -14,6 +14,7 @@
 #include <gnuradio/top_block.h>
 #include <gnuradio/uhd/usrp_source.h>
 #include <gnuradio/iio/fmcomms2_source.h>
+#include <gnuradio/blocks/interleaved_short_to_complex.h>
 #include <iostream>
 #include <numeric>
 #include <osmosdr/source.h>
@@ -71,6 +72,7 @@ class Source {
   std::string device;
   std::string antenna;
   gr::basic_block_sptr source_block;
+  gr::basic_block_sptr conv_block;
   gr::blocks::selector::sptr recorder_selector;
   signal_detector_cvf::sptr signal_detector;
 
