@@ -59,6 +59,8 @@ public:
   std::string talkgroups_file;
   std::string channel_file;
   std::string unit_tags_file;
+  std::string unit_tags_ota_file;
+  std::string unit_tags_mode;
   std::string custom_freq_table_file;
   std::string short_name;
   std::string api_key;
@@ -185,6 +187,10 @@ public:
   void set_channel_file(std::string channel_file) override;
   bool has_channel_file() override;
   void set_unit_tags_file(std::string) override;
+  void set_unit_tags_ota_file(std::string) override;
+  std::string get_unit_tags_ota_file() override;
+  void set_unit_tags_mode(std::string mode) override;
+  std::string get_unit_tags_mode() override;
   void set_custom_freq_table_file(std::string custom_freq_table_file) override;
   std::string get_custom_freq_table_file() override;
   bool has_custom_freq_table_file() override;
@@ -209,6 +215,8 @@ public:
   std::vector<double> get_channels() override;
   std::vector<double> get_control_channels() override;
   std::vector<Talkgroup *> get_talkgroups() override;
+  std::vector<UnitTag *> get_unit_tags() override;
+  std::vector<UnitTagOTA *> get_unit_tags_ota() override;
   gr::msg_queue::sptr msg_queue;
   System_impl(int sys_id);
   void set_bandplan(std::string) override;
@@ -228,6 +236,8 @@ public:
 
   bool get_hideEncrypted() override;
   void set_hideEncrypted(bool hideEncrypted) override;
+  bool get_monitorEncrypted() override;
+  void set_monitorEncrypted(bool monitorEncrypted) override;
 
   bool get_hideUnknown() override;
   void set_hideUnknown(bool hideUnknown) override;
@@ -257,6 +267,7 @@ public:
 private:
   TalkgroupDisplayFormat talkgroup_display_format;
   bool d_hideEncrypted;
+  bool d_monitorEncrypted;
   bool d_hideUnknown;
   bool d_multiSite;
   std::string d_multiSiteSystemName;

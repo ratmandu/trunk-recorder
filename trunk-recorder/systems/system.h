@@ -123,6 +123,10 @@ public:
   virtual void set_channel_file(std::string channel_file) = 0;
   virtual bool has_channel_file() = 0;
   virtual void set_unit_tags_file(std::string) = 0;
+  virtual void set_unit_tags_ota_file(std::string) = 0;
+  virtual std::string get_unit_tags_ota_file() = 0;
+  virtual void set_unit_tags_mode(std::string mode) = 0;
+  virtual std::string get_unit_tags_mode() = 0;
   virtual void set_custom_freq_table_file(std::string custom_freq_table_file) = 0;
   virtual std::string get_custom_freq_table_file() = 0;
   virtual bool has_custom_freq_table_file() = 0;
@@ -147,6 +151,8 @@ public:
   virtual std::vector<double> get_channels() = 0;
   virtual std::vector<double> get_control_channels() = 0;
   virtual std::vector<Talkgroup *> get_talkgroups() = 0;
+  virtual std::vector<UnitTag *> get_unit_tags() = 0;
+  virtual std::vector<UnitTagOTA *> get_unit_tags_ota() = 0;
   virtual void set_bandplan(std::string) = 0;
   virtual std::string get_bandplan() = 0;
   virtual void set_bandfreq(int) = 0;
@@ -164,6 +170,8 @@ public:
 
   virtual bool get_hideEncrypted() = 0;
   virtual void set_hideEncrypted(bool hideEncrypted) = 0;
+  virtual bool get_monitorEncrypted() = 0;
+  virtual void set_monitorEncrypted(bool monitorEncrypted) = 0;
 
   virtual bool get_hideUnknown() = 0;
   virtual void set_hideUnknown(bool hideUnknown) = 0;
