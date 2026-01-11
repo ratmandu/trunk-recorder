@@ -11,7 +11,13 @@ if(NOT PKG_CONFIG_FOUND)
     include(FindPkgConfig)
 endif()
 
-pkg_check_modules(PC_IIO gnuradio-iio)
+# Check if libiio is installed
+pkg_check_modules(PC_IIO iio)
+
+# Check if libad9361 is installed
+pkg_check_modules(PC_AD9361 ad9361)
+
+pkg_check_modules(PC_GR_IIO gnuradio-iio)
 
 if(NOT GnuradioIIO_ROOT)
     set(GnuradioIIO_ROOT_USER_DEFINED /usr)
@@ -123,6 +129,10 @@ if(GnuradioIIO_FOUND AND NOT TARGET Gnuradio::iio)
         INTERFACE_INCLUDE_DIRECTORIES "${IIO_INCLUDE_DIRS}"
         INTERFACE_LINK_LIBRARIES "${IIO_LIBRARIES}"
     )
+endif()
+
+if(NOT PC_IIO_FOUND OR NOT PC_AD9361_FOUND OR NOT PC_GR_IIO_FOUND)
+    set(GnuradioIIO_FOUND FALSE CACHE BOOL "Gnuradio IIO library" FORCE)
 endif()
 
 mark_as_advanced(IIO_LIBRARIES IIO_INCLUDE_DIRS GR_IIO_INCLUDE_HAS_GNURADIO)

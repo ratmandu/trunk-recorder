@@ -149,6 +149,7 @@ Source::Source(double c, double r, double e, std::string drv, std::string dev, C
     source_block = usrp_src;
   }
 
+#ifdef GnuradioIIO_FOUND
   if (driver == "iio") {
     std::vector<bool> enable_channels{1,1,0,0};
     BOOST_LOG_TRIVIAL(info) << "SOURCE TYPE IIO";
@@ -188,6 +189,7 @@ Source::Source(double c, double r, double e, std::string drv, std::string dev, C
 
     source_block = iio_src;
   }
+#endif //GnuradioIIO_FOUND
 }
 
 void Source::set_iq_source(std::string iq_file, bool repeat, double center, double rate) {
@@ -372,11 +374,13 @@ void Source::set_gain(double r) {
     cast_to_usrp_sptr(source_block)->set_gain(gain);
   }
 
+#ifdef GnuradioIIO_FOUND
   if (driver == "iio") {
     gain = r;
     cast_to_iio_sptr(source_block)->set_gain(0, gain);
     BOOST_LOG_TRIVIAL(info) << "Gain set to: " << gain;
   }
+#endif //GnuradioIIO_FOUND
 }
 
 void Source::add_gain_stage(std::string stage_name, double value) {
@@ -428,7 +432,10 @@ void Source::set_gain_mode(bool m) {
     } else {
       BOOST_LOG_TRIVIAL(info) << "Auto gain control is OFF";
     }
-  } else if (driver == "iio") {
+
+  }
+#ifdef GnuradioIIO_FOUND
+ else if (driver == "iio") {
     gain_mode = m;
     if (gain_mode) {
       cast_to_iio_sptr(source_block)->set_gain_mode(0, "fast_attack");
@@ -436,6 +443,7 @@ void Source::set_gain_mode(bool m) {
       cast_to_iio_sptr(source_block)->set_gain_mode(0, "manual");
     }
   }
+#endif
 }
 
 double Source::get_if_gain() {
