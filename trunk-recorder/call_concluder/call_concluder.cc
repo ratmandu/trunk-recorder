@@ -11,7 +11,7 @@ std::list<Call_Data_t> Call_Concluder::retry_call_list = {};
 int combine_wav(std::string files, char *target_filename) {
   char shell_command[4000];
 
-  int nchars = snprintf(shell_command, 4000, "sox %s %s ", files.c_str(), target_filename);
+  int nchars = snprintf(shell_command, 4000, "sox %s '%s' ", files.c_str(), target_filename);
 
   if (nchars >= 4000) {
     BOOST_LOG_TRIVIAL(error) << "Call uploader: SOX Combine WAV Command longer than 4000 characters";
@@ -31,7 +31,7 @@ int combine_wav(std::string files, char *target_filename) {
 int convert_media(char *filename, char *converted, char *date, const char *short_name, const char *talkgroup) {
   char shell_command[400];
 
-  int nchars = snprintf(shell_command, 400, "sox %s --norm=-.01 -t wav - | fdkaac --silent  -p 2 --date '%s' --artist '%s' --title '%s' --moov-before-mdat --ignorelength -b 8000 -o %s -", filename, date, short_name, talkgroup, converted);
+  int nchars = snprintf(shell_command, 400, "sox '%s' --norm=-.01 -t wav - | fdkaac --silent  -p 2 --date '%s' --artist '%s' --title '%s' --moov-before-mdat --ignorelength -b 8000 -o '%s' -", filename, date, short_name, talkgroup, converted);
 
   if (nchars >= 400) {
     BOOST_LOG_TRIVIAL(error) << "Call uploader: Command longer than 400 characters";
@@ -230,8 +230,9 @@ Call_Data_t upload_call_worker(Call_Data_t call_info) {
 
       if (stat(t.filename, &statbuf) == 0)
       {
+          files.append("'");
           files.append(t.filename);
-          files.append(" ");
+          files.append("' ");
       }
       else
       {
@@ -269,7 +270,7 @@ Call_Data_t upload_call_worker(Call_Data_t call_info) {
 
     // Handle the Upload Script, if set
     if (call_info.upload_script.length() != 0) {
-      shell_command << call_info.upload_script << " " << call_info.filename << " " << call_info.status_filename << " " << call_info.converted;
+      shell_command << call_info.upload_script << " '" << call_info.filename << "' '" << call_info.status_filename << "' '" << call_info.converted << "'";
       shell_command_string = shell_command.str();
       std::string loghdr = log_header( call_info.short_name, call_info.call_num, call_info.talkgroup_display , call_info.freq);
       BOOST_LOG_TRIVIAL(info) << loghdr << "\033[0m\tRunning upload script: " << shell_command_string;
@@ -362,6 +363,8 @@ Call_Data_t Call_Concluder::create_call_data(Call *call, System *sys, Config con
   call_info.min_transmissions_removed = 0;
   call_info.color_code = 0;
 
+  std::string loghdr = log_header( call_info.short_name, call_info.call_num, call_info.talkgroup_display , call_info.freq);
+
   if (call->get_is_analog()) {
     call_info.audio_type = "analog";
   } else if (call->get_phase2_tdma()) {
@@ -370,15 +373,17 @@ Call_Data_t Call_Concluder::create_call_data(Call *call, System *sys, Config con
     call_info.audio_type = "digital";
   }
 
+  if (call_info.encrypted) {
+    BOOST_LOG_TRIVIAL(info) << loghdr << Color::RED << "Encrypted call" << Color::RST << " - No audio generated";
+  }
 
   // loop through the transmission list, pull in things to fill in totals for call_info
   // Using a for loop with iterator
   for (std::vector<Transmission>::iterator it = call_info.transmission_list.begin(); it != call_info.transmission_list.end();) {
     Transmission t = *it;
 
-    if (t.length < sys->get_min_tx_duration()) {
+    if (t.length < sys->get_min_tx_duration() && !call_info.encrypted) {
       if (!call_info.transmission_archive) {
-        std::string loghdr = log_header( call_info.short_name, call_info.call_num, call_info.talkgroup_display , call_info.freq);
         BOOST_LOG_TRIVIAL(info) << loghdr << "Removing transmission less than " << sys->get_min_tx_duration() << " seconds. Actual length: " << t.length << ".";
         call_info.min_transmissions_removed++;
 
@@ -398,7 +403,6 @@ Call_Data_t Call_Concluder::create_call_data(Call *call, System *sys, Config con
     }
 
     std::stringstream transmission_info;
-    std::string loghdr = log_header( call_info.short_name, call_info.call_num, call_info.talkgroup_display , call_info.freq);
     transmission_info << loghdr << "- Transmission src: " << t.source << display_tag << " pos: " << format_time(total_length) << " length: " << format_time(t.length);
 
     if (t.error_count < 1) {
@@ -469,7 +473,21 @@ void Call_Concluder::conclude_call(Call *call, System *sys, Config config) {
     remove_call_files(call_info);
     return;
   }
-  else if (call_info.transmission_list.size()== 0 && call_info.min_transmissions_removed == 0) {
+
+  // Clean up after encrypted calls without keys.
+  if (call_info.encrypted) {
+    if (call_info.transmission_list.size() > 0 || call_info.min_transmissions_removed > 0) {
+      int result = create_call_json(call_info);
+      if (result < 0) {
+        BOOST_LOG_TRIVIAL(error) << loghdr << "Failed to create metadata JSON for encrypted call";
+      }
+    }
+    
+    remove_call_files(call_info);
+    return;
+  }
+
+  if (call_info.transmission_list.size() == 0 && call_info.min_transmissions_removed == 0) {
     BOOST_LOG_TRIVIAL(error) << loghdr << "No Transmissions were recorded!";
     return;
   }
