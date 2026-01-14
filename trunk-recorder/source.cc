@@ -189,6 +189,9 @@ Source::Source(double c, double r, double e, std::string drv, std::string dev, C
 
     source_block = iio_src;
   }
+#else // GnuradioIIO_FOUND
+  BOOST_LOG_TRIVIAL(fatal) << "Trunk-recorder was not compiled with IIO enabled.";
+  exit(1);
 #endif //GnuradioIIO_FOUND
 }
 
@@ -380,6 +383,9 @@ void Source::set_gain(double r) {
     cast_to_iio_sptr(source_block)->set_gain(0, gain);
     BOOST_LOG_TRIVIAL(info) << "Gain set to: " << gain;
   }
+#else // GnuradioIIO_FOUND
+  BOOST_LOG_TRIVIAL(fatal) << "Trunk-recorder was not compiled with IIO enabled.";
+  exit(1);
 #endif //GnuradioIIO_FOUND
 }
 
@@ -443,6 +449,9 @@ void Source::set_gain_mode(bool m) {
       cast_to_iio_sptr(source_block)->set_gain_mode(0, "manual");
     }
   }
+#else // GnuradioIIO_FOUND
+  BOOST_LOG_TRIVIAL(fatal) << "Trunk-recorder was not compiled with IIO enabled.";
+  exit(1);
 #endif
 }
 
